@@ -24,10 +24,12 @@ Then edit the `/etc/freqcpu/freqcpu.conf` file to your own values.
 
 ## Example configuration file:
 
+```
 cores_cpu=16
 freq_min=2000Mhz
 freq_max=3600Mhz
 governor=powersave
+```
 
 ## Boot with system:
 
