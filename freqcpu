@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# Configuration file
+config_file=/etc/freqcpu/freqcpu.conf
+
+# Default config
+cores_cpu=$(grep -c ^processor /proc/cpuinfo 2> /dev/null)
+freq_min="2000Mhz"
+freq_max="3600Mhz"
+governor=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2> /dev/null | head -1)
+#governor=powersave
+
+# Check dependencies
+path_check="/usr/bin /bin /usr/local/bin $HOME/.local/bin $(brew --prefix 2> /dev/null)/bin"
+dependencies="dirname basename cpufreq-set expr cat watch grep"
+dependencies_found=""
+dependencies_not_found=""
+for checkPath in $path_check ; do
+  for checkDependencies in $dependencies ; do
+    if [ -f $checkPath/$checkDependencies ] ; then
+      dependencies_found="$dependencies_found $checkDependencies"
+    fi
+  done
+done
+for notFound in $dependencies ; do
+  check_found_one=$(echo $dependencies_found | grep " $notFound")
+  check_found_two=$(echo $dependencies_found | grep "$notFound ")
+  if_not_found="$check_found_one$check_found_two"
+  if [ -z "$if_not_found" ] ; then
+    dependencies_not_found="$dependencies_not_found $notFound"
+  fi
+done
+# Show if all tools are installed
+if [ -z "$dependencies_not_found" ] ; then
+  echo > /dev/null
+else
+  echo "$(basename $0): Some required tools are not installed:$dependencies_not_found"
+  exit 1
+fi
+
+# Function to check root permissions
+function check_root() {
+  mkdir -p /etc/root 2> /dev/null
+  rootperm=$?
+  if [ $rootperm -eq 0 ] ; then
+    rm -rf /etc/root
+  else
+    echo "$(basename $0): Root permission is required to perform this operation"
+    exit
+  fi
+}
+
+function help() {
+  echo ""
+  if [ -f ${config_file} ] ; then
+    source ${config_file}
+  fi
+  echo "$(basename $0) - limit CPU frequency"
+  echo ""
+  echo "* Config:"
+  echo "   freq_min: ${freq_min}"
+  echo "   freq_max: ${freq_max}"
+  echo "   cores_cpu: ${cores_cpu}"
+  echo "   governor: ${governor}"
+  echo ""
+  echo "* Syntax:"
+  echo ""
+  echo "  $(basename $0) -c  --> create initial configuration file"
+  echo "  $(basename $0) -d  --> run daemon for set CPU frequency"
+  echo "  $(basename $0) -r  --> set limit CPU frequency"
+  echo "  $(basename $0) -f  --> show current CPU frequency"
+  echo "  $(basename $0) -g  --> show current CPU governor"
+  echo "  $(basename $0) -o  --> show CPU cores"
+  echo "  $(basename $0) -h  --> show help"
+  echo ""
+  exit 0
+}
+
+function create_config() {
+  mkdir -p /etc/freqcpu
+  echo "cores_cpu=${cores_cpu} # Set number of CPUs" > ${config_file}
+  echo "freq_min=${freq_min}" >> ${config_file} 
+  echo "freq_max=${freq_max}" >> ${config_file} 
+  echo "governor=${governor} # Set powersave, performance, balanced" >> ${config_file}
+  echo "$(basename $0): created ${config_file} successfully"
+  exit 0
+}
+
+function check_config() {
+  if [ -f ${config_file} ] ; then
+    source ${config_file}
+  else
+    echo "$(basename $0): no configuration file exists in /etc/freqcpu/freqcpu.conf"
+    echo "$(basename $0): first run the command -> freqcpu -c"
+    exit 0
+  fi
+}
+
+# Run commands
+if [ "${1}" == "-d" ] ; then
+  check_root
+  check_config
+  source ${config_file}
+  echo "$(basename $0) - running limit CPU frequency daemon"
+  sleep 10
+  frecuency=0
+  num_cpus_total=$(expr ${cores_cpu} - 1)
+  num_cpu=0
+  while [ ${frecuency} -eq 0 ] ; do
+    while [ ${num_cpu} -le ${num_cpus_total} ] ; do
+      echo "set CPU ${num_cpu} freq (${freq_min}/${freq_max}) (governor: ${governor})"
+      cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+      num_cpu=$(expr ${num_cpu} + 1)
+    done
+    sleep 3600
+  done
+elif [ "${1}" == "-c" ] ; then
+  check_root
+  create_config
+elif [ "${1}" == "-r" ] ; then
+  check_root
+  check_config
+  source ${config_file}
+  num_cpus_total=$(expr ${cores_cpu} - 1)
+  num_cpu=0
+  while [ ${num_cpu} -le ${num_cpus_total} ] ; do
+    echo "set CPU ${num_cpu} freq (${freq_min}/${freq_max}) (governor: ${governor})"
+    cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+    num_cpu=$(expr ${num_cpu} + 1)
+  done
+elif [ "${1}" == "-f" ] ; then
+  watch -n1 "cat /proc/cpuinfo | grep \"^[c]pu MHz\""
+elif [ "${1}" == "-g" ] ; then
+  cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2> /dev/null | head -1
+elif [ "${1}" == "-o" ] ; then
+  grep -c ^processor /proc/cpuinfo 2> /dev/null
+else
+  help
+fi
+
+
