@@ -113,6 +113,7 @@ if [ "${1}" == "-d" ] ; then
       num_cpu=$(expr ${num_cpu} + 1)
     done
     sleep 3600
+    num_cpu=0
   done
 elif [ "${1}" == "-c" ] ; then
   check_root
