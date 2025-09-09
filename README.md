@@ -41,7 +41,7 @@ sudo systemctl enable freqcpu
 ## How to install:
 
 ```
-git clone https://git.q3aql.dev/q3aql/freqcpu
+git clone https://github.com/q3aql/freqcpu
 cd freqcpu
 sudo make install
 ```
@@ -49,13 +49,13 @@ sudo make install
 ## How to uninstall:
 
 ```
-git clone https://git.q3aql.dev/q3aql/freqcpu
+git clone https://github.com/q3aql/freqcpu
 cd freqcpu
 sudo make uninstall 
 ```
 
 ## Dependencies
 * bash
-* cpufrequtils
+* cpupower or cpufrequtils
 * watch
 
