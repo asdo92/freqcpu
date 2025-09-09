@@ -11,30 +11,11 @@ governor=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2> /dev/nul
 #governor=powersave
 
 # Check dependencies
-path_check="/usr/bin /bin /usr/local/bin $HOME/.local/bin $(brew --prefix 2> /dev/null)/bin"
-dependencies="dirname basename cpufreq-set expr cat watch grep"
-dependencies_found=""
-dependencies_not_found=""
-for checkPath in $path_check ; do
-  for checkDependencies in $dependencies ; do
-    if [ -f $checkPath/$checkDependencies ] ; then
-      dependencies_found="$dependencies_found $checkDependencies"
-    fi
-  done
-done
-for notFound in $dependencies ; do
-  check_found_one=$(echo $dependencies_found | grep " $notFound")
-  check_found_two=$(echo $dependencies_found | grep "$notFound ")
-  if_not_found="$check_found_one$check_found_two"
-  if [ -z "$if_not_found" ] ; then
-    dependencies_not_found="$dependencies_not_found $notFound"
-  fi
-done
+dependencies_not_found=$(which cpupower cpufreq-set | head -1)
+detected=$(basename ${dependencies_not_found} 2> /dev/null)
 # Show if all tools are installed
 if [ -z "$dependencies_not_found" ] ; then
-  echo > /dev/null
-else
-  echo "$(basename $0): Some required tools are not installed:$dependencies_not_found"
+  echo "$(basename $0): Dependency not found: cpupower or cpufreq-set (cpufrequtils)"
   exit 1
 fi
 
@@ -55,7 +36,7 @@ function help() {
   if [ -f ${config_file} ] ; then
     source ${config_file}
   fi
-  echo "$(basename $0) - limit CPU frequency"
+  echo "$(basename $0) - limit CPU frequency (${detected})"
   echo ""
   echo "* Config:"
   echo "   freq_min: ${freq_min}"
@@ -109,7 +90,12 @@ if [ "${1}" == "-d" ] ; then
   while [ ${frecuency} -eq 0 ] ; do
     while [ ${num_cpu} -le ${num_cpus_total} ] ; do
       echo "set CPU ${num_cpu} freq (${freq_min}/${freq_max}) (governor: ${governor})"
-      cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+      if [ "${detected}" == "cpufreq-set" ] ; then
+        cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+      fi
+      if [ "${detected}" == "cpupower" ] ; then
+        cpupower --cpu ${num_cpu} frequency-set --min ${freq_min} --max ${freq_max} --governor ${governor}
+      fi
       num_cpu=$(expr ${num_cpu} + 1)
     done
     sleep 3600
@@ -126,7 +112,12 @@ elif [ "${1}" == "-r" ] ; then
   num_cpu=0
   while [ ${num_cpu} -le ${num_cpus_total} ] ; do
     echo "set CPU ${num_cpu} freq (${freq_min}/${freq_max}) (governor: ${governor})"
-    cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+    if [ "${detected}" == "cpufreq-set" ] ; then
+      cpufreq-set --cpu ${num_cpu} --min ${freq_min} --max ${freq_max} --governor ${governor}
+    fi
+    if [ "${detected}" == "cpupower" ] ; then
+      cpupower --cpu ${num_cpu} frequency-set --min ${freq_min} --max ${freq_max} --governor ${governor}
+    fi
     num_cpu=$(expr ${num_cpu} + 1)
   done
 elif [ "${1}" == "-f" ] ; then
